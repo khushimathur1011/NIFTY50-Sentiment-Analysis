@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NIFTY 50 · Sentiment Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f;--s1:#0e1118;--s2:#151820;--s3:#1c2030;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --txt:#dde1f0;--muted:#6b718a;--dim:#3a3f52;
+  --green:#22d484;--green-a:rgba(34,212,132,0.15);--green-b:rgba(34,212,132,0.35);
+  --red:#ff4f6a;--red-a:rgba(255,79,106,0.15);--red-b:rgba(255,79,106,0.35);
+  --blue:#4f9eff;--blue-a:rgba(79,158,255,0.15);
+  --purple:#9d7ff4;--amber:#f5a623;--teal:#2dd4bf;
+  --font:'Segoe UI',system-ui,sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:var(--font);font-size:13px;min-height:100vh}
+
+/* NAV */
+nav{
+  position:sticky;top:0;z-index:200;
+  background:rgba(7,9,15,0.92);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  padding:0 28px;height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.nav-brand{display:flex;align-items:center;gap:12px}
+.brand-icon{
+  width:32px;height:32px;border-radius:8px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--green),var(--blue));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:12px;color:#07090f;letter-spacing:-0.5px;
+}
+.brand-name{font-size:15px;font-weight:600;color:var(--txt);letter-spacing:-.2px}
+.brand-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.nav-right{display:flex;align-items:center;gap:10px}
+.nav-pill{
+  font-size:11px;font-weight:500;padding:4px 12px;border-radius:20px;
+  border:1px solid var(--border2);color:var(--muted);background:transparent;
+  cursor:pointer;font-family:var(--font);transition:all .2s;
+}
+.nav-pill:hover{color:var(--txt);border-color:rgba(255,255,255,0.25)}
+.nav-pill.active{background:var(--blue-a);color:var(--blue);border-color:rgba(79,158,255,0.4)}
+.status-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;flex-shrink:0;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* LAYOUT */
+.wrap{max-width:1380px;margin:0 auto;padding:22px 28px 40px}
+
+/* FILTER BAR */
+.fbar{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin-bottom:20px;padding:10px 14px;
+  background:var(--s1);border:1px solid var(--border);border-radius:10px;
+}
+.fbar-label{font-size:11px;color:var(--muted);margin-right:4px;letter-spacing:.04em;text-transform:uppercase}
+.fbtn{
+  font-size:11px;padding:4px 12px;border-radius:20px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--muted);cursor:pointer;font-family:var(--font);transition:all .18s;
+}
+.fbtn:hover{color:var(--txt);border-color:var(--border2)}
+.fbtn.fa{background:var(--blue-a);color:var(--blue);border-color:rgba(79,158,255,.4)}
+.fbtn.fp{background:var(--green-a);color:var(--green);border-color:var(--green-b)}
+.fbtn.fn{background:var(--red-a);color:var(--red);border-color:var(--red-b)}
+.fbar-right{margin-left:auto;font-size:11px;color:var(--muted)}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:500px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{
+  background:var(--s1);border:1px solid var(--border);border-radius:12px;
+  padding:14px 15px;position:relative;overflow:hidden;
+  transition:border-color .2s,transform .2s;
+}
+.kpi:hover{border-color:var(--border2);transform:translateY(-1px)}
+.kpi::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--kc,var(--blue));opacity:.8;border-radius:2px 2px 0 0;
+}
+.kpi-lbl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.kpi-val{font-size:22px;font-weight:700;color:var(--kc,var(--txt));letter-spacing:-.5px;line-height:1}
+.kpi-sub{font-size:10px;color:var(--dim);margin-top:5px}
+
+/* SECTION HEADER */
+.sec-hd{
+  display:flex;align-items:center;gap:10px;
+  font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:12px;
+}
+.sec-hd::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* CARD */
+.card{
+  background:var(--s1);border:1px solid var(--border);border-radius:14px;
+  padding:18px 20px;
+}
+.card-t{
+  font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;
+}
+.card-t span{font-size:11px;color:var(--dim);text-transform:none;letter-spacing:0;font-weight:400}
+
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.g32{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
+.g23{display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px}
+.full{margin-bottom:12px}
+@media(max-width:820px){.g2,.g3,.g32,.g23{grid-template-columns:1fr}}
+
+/* LEGEND */
+.leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.leg-i{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.leg-d{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+/* CHART WRAPPERS */
+.cw{position:relative;width:100%}
+
+/* HEATMAP */
+.hm-wrap{overflow-x:auto}
+.hm-grid{display:inline-grid;gap:3px;min-width:100%}
+.hm-cell{
+  width:28px;height:28px;border-radius:4px;cursor:pointer;
+  transition:transform .15s,filter .15s;position:relative;
+}
+.hm-cell:hover{transform:scale(1.25);filter:brightness(1.3);z-index:10}
+.hm-label-row{display:flex;gap:3px;margin-bottom:4px}
+.hm-mlabel{width:28px;text-align:center;font-size:9px;color:var(--muted)}
+.hm-row{display:flex;gap:3px;align-items:center}
+.hm-wlabel{font-size:9px;color:var(--muted);width:22px;text-align:right;flex-shrink:0;margin-right:4px}
+.hm-legend-bar{
+  display:flex;align-items:center;gap:8px;margin-top:12px;font-size:10px;color:var(--muted);
+}
+.hm-grad{
+  flex:1;max-width:180px;height:8px;border-radius:4px;
+  background:linear-gradient(90deg,var(--red),#444,var(--green));
+}
+.tooltip{
+  position:fixed;background:var(--s3);border:1px solid var(--border2);
+  border-radius:8px;padding:8px 12px;font-size:11px;color:var(--txt);
+  pointer-events:none;z-index:999;display:none;line-height:1.6;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+
+/* CONFUSION MATRIX */
+.cm-grid{display:grid;grid-template-columns:20px 1fr 1fr;grid-template-rows:20px 1fr 1fr;gap:5px}
+.cm-ax{font-size:9px;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.cm-cell{border-radius:10px;padding:12px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid}
+.cm-g{background:var(--green-a);border-color:var(--green-b)}
+.cm-r{background:var(--red-a);border-color:var(--red-b)}
+.cm-n{font-size:26px;font-weight:700}
+.cm-d{font-size:9px;color:var(--muted);margin-top:3px;text-align:center}
+
+/* COEF BARS */
+.coef-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.coef-nm{font-size:11px;color:var(--muted);width:96px;text-align:right;flex-shrink:0}
+.coef-track{flex:1;height:10px;background:var(--s3);border-radius:5px;overflow:hidden;position:relative}
+.coef-fill-p{height:100%;border-radius:5px;background:linear-gradient(90deg,rgba(34,212,132,.5),var(--green))}
+.coef-fill-n{height:100%;border-radius:5px;background:linear-gradient(270deg,rgba(255,79,106,.5),var(--red));margin-left:auto}
+.coef-v{font-size:10px;width:36px;flex-shrink:0}
+
+/* STAT TABLE */
+.stbl{width:100%;border-collapse:collapse;font-size:12px}
+.stbl th{color:var(--muted);font-weight:500;text-align:left;padding:5px 0;border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.stbl td{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.03);color:var(--txt)}
+.stbl tr:last-child td{border:none}
+.pill{display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px}
+.pg{background:var(--green-a);color:var(--green)}
+.pr{background:var(--red-a);color:var(--red)}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.kpi{animation:fadeUp .4s ease both}
+.kpi:nth-child(1){animation-delay:.04s}.kpi:nth-child(2){animation-delay:.08s}
+.kpi:nth-child(3){animation-delay:.12s}.kpi:nth-child(4){animation-delay:.16s}
+.kpi:nth-child(5){animation-delay:.2s}.kpi:nth-child(6){animation-delay:.24s}
+.card{animation:fadeUp .45s ease .15s both}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <div class="brand-icon">N50</div>
+    <div>
+      <div class="brand-name">NIFTY 50 · Sentiment Analysis</div>
+      <div class="brand-sub">Apr 15 – Oct 14, 2025 &nbsp;·&nbsp; NSE India &nbsp;·&nbsp; ML: Logistic Regression</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="status-dot"></div>
+    <button class="nav-pill active">Overview</button>
+    <button class="nav-pill" onclick="document.getElementById('ml-section').scrollIntoView({behavior:'smooth'})">ML Model</button>
+    <button class="nav-pill" onclick="document.getElementById('hm-section').scrollIntoView({behavior:'smooth'})">Heatmap</button>
+  </div>
+</nav>
+
+<div class="tooltip" id="tt"></div>
+
+<div class="wrap">
+
+  <!-- FILTER BAR -->
+  <div class="fbar">
+    <span class="fbar-label">Session filter</span>
+    <button class="fbtn fa" id="btn-all" onclick="setFilter('all')">All Sessions</button>
+    <button class="fbtn" id="btn-pos" onclick="setFilter('pos')">Bullish Only</button>
+    <button class="fbtn" id="btn-neg" onclick="setFilter('neg')">Bearish Only</button>
+    <div class="fbar-right" id="fbar-info">Showing all 126 trading sessions</div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi" style="--kc:var(--blue)">
+      <div class="kpi-lbl">Total Sessions</div>
+      <div class="kpi-val">126</div>
+      <div class="kpi-sub">NSE trading days</div>
+    </div>
+    <div class="kpi" style="--kc:var(--green)">
+      <div class="kpi-lbl">Bullish Days</div>
+      <div class="kpi-val">59</div>
+      <div class="kpi-sub">46.8% of sessions</div>
+    </div>
+    <div class="kpi" style="--kc:var(--red)">
+      <div class="kpi-lbl">Bearish Days</div>
+      <div class="kpi-val">67</div>
+      <div class="kpi-sub">53.2% of sessions</div>
+    </div>
+    <div class="kpi" style="--kc:var(--blue)">
+      <div class="kpi-lbl">Model Accuracy</div>
+      <div class="kpi-val">96.2%</div>
+      <div class="kpi-sub">on 26 test sessions</div>
+    </div>
+    <div class="kpi" style="--kc:var(--purple)">
+      <div class="kpi-lbl">Precision Score</div>
+      <div class="kpi-val">96.4%</div>
+      <div class="kpi-sub">weighted average</div>
+    </div>
+    <div class="kpi" style="--kc:var(--amber)">
+      <div class="kpi-lbl">Price Range</div>
+      <div class="kpi-val">₹1,923</div>
+      <div class="kpi-sub">23,329 – 25,637</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: Pie + Bar -->
+  <div class="sec-hd">Market Sentiment Overview</div>
+  <div class="g2" style="margin-bottom:12px">
+    <div class="card">
+      <div class="card-t">Sentiment Distribution <span id="pie-sub">126 sessions</span></div>
+      <div class="leg">
+        <div class="leg-i"><div class="leg-d" style="background:var(--green)"></div>Bullish close</div>
+        <div class="leg-i"><div class="leg-d" style="background:var(--red)"></div>Bearish close</div>
+      </div>
+      <div class="cw" style="height:220px"><canvas id="pieChart" role="img" aria-label="Doughnut: 59 bullish, 67 bearish">59 bullish, 67 bearish.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-t">Monthly Breakdown</div>
+      <div class="leg">
+        <div class="leg-i"><div class="leg-d" style="background:var(--green)"></div>Bullish</div>
+        <div class="leg-i"><div class="leg-d" style="background:var(--red)"></div>Bearish</div>
+      </div>
+      <div class="cw" style="height:220px"><canvas id="barChart" role="img" aria-label="Monthly grouped bar chart">Monthly sentiment.</canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Timeline (full) -->
+  <div class="full card">
+    <div class="card-t">Close Price Timeline — Sentiment Overlay <span id="tl-sub">All sessions</span></div>
+    <div class="leg">
+      <div class="leg-i"><div class="leg-d" style="background:var(--green)"></div>Bullish close</div>
+      <div class="leg-i"><div class="leg-d" style="background:var(--red)"></div>Bearish close</div>
+    </div>
+    <div class="cw" style="height:240px"><canvas id="timelineChart" role="img" aria-label="Price timeline scatter">Timeline.</canvas></div>
+  </div>
+
+  <!-- ROW 3: Volume + Spread + OHLC -->
+  <div class="g3">
+    <div class="card">
+      <div class="card-t">Volume vs Turnover</div>
+      <div class="cw" style="height:200px"><canvas id="volChart" role="img" aria-label="Volume scatter">Volume.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-t">Daily Price Range (H−L)</div>
+      <div class="cw" style="height:200px"><canvas id="spreadChart" role="img" aria-label="Spread scatter">Spread.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-t">Avg OHLC by Sentiment</div>
+      <div class="cw" style="height:200px"><canvas id="ohlcChart" role="img" aria-label="OHLC grouped bar">OHLC.</canvas></div>
+    </div>
+  </div>
+
+  <!-- HEATMAP SECTION -->
+  <div class="sec-hd" id="hm-section" style="margin-top:8px">Correlation Heatmap — Feature Relationships</div>
+  <div class="full card">
+    <div class="card-t">Pearson Correlation Matrix <span>Hover cells for values</span></div>
+    <div class="hm-wrap" id="hmWrap"></div>
+    <div class="hm-legend-bar">
+      <span>−1.0 (strong negative)</span>
+      <div class="hm-grad"></div>
+      <span>+1.0 (strong positive)</span>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.7">
+      Open / High / Low / Close are near-perfectly correlated (≥0.99) — all track the same underlying index.
+      Sentiment_Label shows low correlation with raw price levels, confirming that price level alone is insufficient;
+      the directional relationship (Close vs Open) carries the signal.
+    </div>
+  </div>
+
+  <!-- ML SECTION -->
+  <div class="sec-hd" id="ml-section">Machine Learning Model — Logistic Regression</div>
+  <div class="g3">
+    <!-- Confusion Matrix -->
+    <div class="card">
+      <div class="card-t">Confusion Matrix <span>26 test sessions</span></div>
+      <div style="font-size:9px;color:var(--muted);text-align:center;margin-bottom:6px">→ Predicted</div>
+      <div class="cm-grid">
+        <div></div>
+        <div class="cm-ax" style="font-size:9px">Pred. Bear</div>
+        <div class="cm-ax" style="font-size:9px">Pred. Bull</div>
+        <div class="cm-ax" style="writing-mode:vertical-lr;transform:rotate(180deg)">Act. Bear</div>
+        <div class="cm-cell cm-g"><span class="cm-n" style="color:var(--green)">14</span><span class="cm-d">True Negative</span></div>
+        <div class="cm-cell cm-r"><span class="cm-n" style="color:var(--red)">0</span><span class="cm-d">False Positive</span></div>
+        <div class="cm-ax" style="writing-mode:vertical-lr;transform:rotate(180deg)">Act. Bull</div>
+        <div class="cm-cell cm-r"><span class="cm-n" style="color:var(--red)">1</span><span class="cm-d">False Negative</span></div>
+        <div class="cm-cell cm-g"><span class="cm-n" style="color:var(--green)">11</span><span class="cm-d">True Positive</span></div>
+      </div>
+      <table class="stbl" style="margin-top:12px">
+        <tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th></tr>
+        <tr><td><span class="pill pr">Bearish</span></td><td>93.3%</td><td>100%</td><td>96.6%</td></tr>
+        <tr><td><span class="pill pg">Bullish</span></td><td>100%</td><td>91.7%</td><td>95.7%</td></tr>
+      </table>
+    </div>
+
+    <!-- Feature Coefficients -->
+    <div class="card">
+      <div class="card-t">Feature Coefficients</div>
+      <div id="coefBars"></div>
+      <div style="margin-top:10px;font-size:10px;color:var(--muted);line-height:1.7">
+        <span style="color:var(--green)">Green</span> = bullish signal.
+        <span style="color:var(--red)">Red</span> = bearish signal.<br>
+        Close price carries the strongest directional weight in the model.
+      </div>
+    </div>
+
+    <!-- Performance bar -->
+    <div class="card">
+      <div class="card-t">Per-Class Performance</div>
+      <div class="cw" style="height:190px"><canvas id="perfChart" role="img" aria-label="Horizontal bar of precision recall F1">Performance.</canvas></div>
+      <table class="stbl" style="margin-top:10px">
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td style="color:var(--muted)">Train set</td><td>100 sessions (80%)</td></tr>
+        <tr><td style="color:var(--muted)">Test set</td><td>26 sessions (20%)</td></tr>
+        <tr><td style="color:var(--muted)">Accuracy</td><td style="color:var(--green);font-weight:700">96.15%</td></tr>
+        <tr><td style="color:var(--muted)">Macro F1</td><td style="color:var(--blue);font-weight:700">96.1%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div style="text-align:center;font-size:11px;color:var(--dim);padding:24px 0 8px;border-top:1px solid var(--border);margin-top:8px">
+    Sentiment Analysis and Data Visualization of NIFTY 50 using Machine Learning &nbsp;·&nbsp;
+    Dataset: NSE India (Apr–Oct 2025) &nbsp;·&nbsp; Logistic Regression via Scikit-learn
+  </div>
+</div>
+<script>
+const RAW=[["15-Apr-25",23368.35,23368.35,23207,23328.55,388321931,34216.17],["16-Apr-25",23344.1,23452.2,23273.05,23437.2,348424960,28102.36],["17-Apr-25",23401.85,23872.35,23298.55,23851.65,505333905,38450.09],["21-Apr-25",23949.15,24189.55,23903.65,24125.55,406145632,33125.62],["22-Apr-25",24185.4,24242.6,24072,24167.25,440940490,35479.29],["23-Apr-25",24357.6,24359.3,24119.95,24328.95,415042544,34527.08],["24-Apr-25",24277.9,24347.85,24216.15,24246.7,358768165,33057.29],["25-Apr-25",24289,24365.45,23847.85,24039.35,387741866,33430.86],["28-Apr-25",24070.25,24355.1,24054.05,24328.5,320467976,28278.82],["29-Apr-25",24370.7,24457.65,24290.75,24335.95,357563224,30436.88],["30-Apr-25",24342.05,24396.15,24198.75,24334.2,424452559,41073.48],["02-May-25",24311.9,24589.15,24238.5,24346.7,421112627,34043.27],["05-May-25",24419.5,24526.4,24400.65,24461.15,291471628,26918.36],["06-May-25",24500.75,24509.65,24331.8,24379.6,302354059,26481.15],["07-May-25",24233.3,24449.6,24220,24414.4,330137191,27648.34],["08-May-25",24431.5,24447.25,24150.2,24273.8,411362230,36893.06],["09-May-25",23935.75,24164.25,23935.75,24008,335550680,28942.61],["12-May-25",24420.1,24944.8,24378.85,24924.7,368707684,30362.27],["13-May-25",24864.05,24973.8,24547.5,24578.35,422977876,34576.66],["14-May-25",24613.8,24767.55,24535.55,24666.9,345490805,25585.37],["15-May-25",24694.45,25116.25,24494.45,25062.1,500821889,44147.39],["16-May-25",25064.65,25070,24953.05,25019.8,432717092,43815.86],["19-May-25",25005.35,25062.95,24916.65,24945.45,255254340,21598.6],["20-May-25",24996.2,25010.35,24669.7,24683.9,414799113,31063.03],["21-May-25",24744.25,24946.2,24685.35,24813.45,332724952,23179.85],["22-May-25",24733.95,24737.5,24462.4,24609.7,403279638,30579.52],["23-May-25",24639.5,24909.05,24614.05,24853.15,270470348,20200.73],["26-May-25",24919.35,25079.2,24900.5,25001.15,302799227,20060.68],["27-May-25",24956.65,25062.9,24704.1,24826.2,525653668,33638.3],["28-May-25",24832.5,24864.25,24737.05,24752.45,684425321,37143.55],["29-May-25",24825.1,24892.6,24677.3,24833.6,345370611,29730.05],["30-May-25",24812.6,24863.95,24717.4,24750.7,853890978,52247.87],["02-Jun-25",24669.7,24754.4,24526.15,24716.6,311100908,25091.04],["03-Jun-25",24786.3,24845.1,24502.15,24542.5,349288937,28906.4],["04-Jun-25",24560.45,24644.25,24530.45,24620.2,280862575,21907.07],["05-Jun-25",24691.2,24899.85,24613.1,24750.9,388405978,30186.46],["06-Jun-25",24748.7,25029.5,24671.45,25003.05,335581057,30041.71],["09-Jun-25",25160.1,25160.1,25077.15,25103.2,279219989,25606.21],["10-Jun-25",25196.05,25199.3,25055.45,25104.25,307323471,28813.93],["11-Jun-25",25134.15,25222.4,25081.3,25141.4,301245273,25871.18],["12-Jun-25",25164.45,25196.2,24825.9,24888.2,328310748,29573.27],["13-Jun-25",24473,24754.35,24473,24718.6,318711364,24838.56],["16-Jun-25",24732.35,24967.1,24703.6,24946.5,305813047,23857.15],["17-Jun-25",24977.85,24982.05,24813.7,24853.4,242415740,21818.05],["18-Jun-25",24788.35,24947.55,24750.45,24812.05,237599011,22044.05],["19-Jun-25",24803.25,24863.1,24733.4,24793.25,274619935,23620.79],["20-Jun-25",24787.65,25136.2,24783.65,25112.4,574654035,55782.03],["23-Jun-25",24939.75,25057,24824.85,24971.9,248534153,20797.88],["24-Jun-25",25179.9,25317.7,24999.7,25044.35,450185468,35508.9],["25-Jun-25",25150.35,25266.8,25125.05,25244.75,260582584,22985.17],["26-Jun-25",25268.95,25565.3,25259.9,25549,428891818,38689.39],["27-Jun-25",25576.65,25654.2,25523.55,25637.8,563957748,47108.6],["30-Jun-25",25661.65,25669.35,25473.3,25517.05,270981274,24673.48],["01-Jul-25",25551.35,25593.4,25501.8,25541.8,260669106,23921.02],["02-Jul-25",25588.3,25608.1,25378.75,25453.4,309828013,26681.66],["03-Jul-25",25505.1,25587.5,25384.35,25405.3,293428797,24531.7],["04-Jul-25",25428.85,25470.25,25331.65,25461,193511595,19101.33],["07-Jul-25",25450.45,25489.8,25407.25,25461.3,196051345,16923.26],["08-Jul-25",25427.85,25548.05,25424.15,25522.5,210410530,21947.32],["09-Jul-25",25514.6,25548.7,25424.35,25476.1,239081546,20549.5],["10-Jul-25",25511.65,25524.05,25340.45,25355.25,219609322,21435.36],["11-Jul-25",25255.5,25322.45,25129,25149.85,249987681,26251.65],["14-Jul-25",25149.5,25151.1,25001.95,25082.3,259533624,23316.33],["15-Jul-25",25089.5,25245.2,25088.45,25195.8,241340130,23282.7],["16-Jul-25",25196.6,25255.3,25121.05,25212.05,228815928,22254.54],["17-Jul-25",25230.75,25238.35,25101,25111.45,243412540,24715.35],["18-Jul-25",25108.55,25144.6,24918.65,24968.4,316979826,26330.8],["21-Jul-25",24999,25111.4,24882.3,25090.7,305216414,26062.25],["22-Jul-25",25166.65,25182,25035.55,25060.9,483725120,31248.06],["23-Jul-25",25139.35,25233.5,25085.5,25219.9,271539651,23042.49],["24-Jul-25",25243.3,25246.25,25018.7,25062.1,338728860,27433.34],["25-Jul-25",25010.35,25010.35,24806.35,24837,278136104,25273.64],["28-Jul-25",24782.45,24889.2,24646.6,24680.9,262142969,24976.54],["29-Jul-25",24609.65,24847.15,24598.6,24821.1,284657235,25954.42],["30-Jul-25",24890.4,24902.3,24771.95,24855.05,243886726,23525.25],["31-Jul-25",24642.25,24956.5,24635,24768.35,346303628,30477.71],["01-Aug-25",24734.9,24784.15,24535.05,24565.35,263357194,24972.45],["04-Aug-25",24596.05,24736.25,24554,24722.75,259329477,20372.68],["05-Aug-25",24720.25,24733.1,24590.3,24649.55,251849778,23815.36],["06-Aug-25",24641.35,24671.4,24539.2,24574.2,225091071,20559.22],["07-Aug-25",24464.2,24634.2,24344.15,24596.15,616739190,35574.59],["08-Aug-25",24544.25,24585.5,24337.5,24363.3,312630157,38135.74],["11-Aug-25",24371.5,24600.85,24347.45,24585.05,241145497,21081.61],["12-Aug-25",24563.35,24702.6,24465.65,24487.4,237002462,22258.29],["13-Aug-25",24586.2,24664.55,24535.25,24619.35,236006791,22843.14],["14-Aug-25",24607.25,24673.65,24596.9,24631.3,270162203,22375.44],["18-Aug-25",24938.2,25022,24852.85,24876.95,363071305,37637.67],["19-Aug-25",24891.35,25012.65,24873.95,24980.65,252340828,24781.97],["20-Aug-25",24965.8,25088.7,24929.7,25050.55,287054119,25330.45],["21-Aug-25",25142,25153.65,25054.9,25083.75,226542052,21865.07],["22-Aug-25",25064.15,25084.85,24859.15,24870.1,210165384,19655.78],["25-Aug-25",24949.15,25021.55,24894.35,24967.75,213032133,19871.25],["26-Aug-25",24899.5,24919.65,24689.6,24712.05,750473927,47068.2],["28-Aug-25",24695.8,24702.65,24481.6,24500.9,326601486,29371.67],["29-Aug-25",24466.7,24572.45,24404.7,24426.85,325543583,26796.69],["01-Sep-25",24432.7,24635.6,24432.7,24625.05,229327424,20704.88],["02-Sep-25",24653,24756.1,24522.35,24579.6,271558516,22051.8],["03-Sep-25",24616.5,24737.05,24533.2,24715.05,340283328,23533.08],["04-Sep-25",24980.75,24980.75,24708.2,24734.3,314094160,30252.19],["05-Sep-25",24818.85,24832.35,24621.6,24741,210071924,18530.24],["08-Sep-25",24802.6,24885.5,24751.55,24773.15,213228202,20122.88],["09-Sep-25",24864.1,24891.8,24814,24868.6,226919775,22356.88],["10-Sep-25",24991,25035.7,24915.05,24973.1,244146466,22458.98],["11-Sep-25",24945.5,25037.3,24940.15,25005.5,224570983,21316.72],["12-Sep-25",25074.45,25139.45,25038.05,25114,225739766,21335.67],["15-Sep-25",25118.9,25138.45,25048.75,25069.2,185375759,17115.6],["16-Sep-25",25073.6,25261.4,25070.45,25239.1,240122320,22642.86],["17-Sep-25",25276.6,25346.5,25275.35,25330.25,268936695,23484.12],["18-Sep-25",25441.05,25448.95,25329.75,25423.6,272193683,24198.11],["19-Sep-25",25410.2,25431.4,25286.3,25327.05,380362832,38805.58],["22-Sep-25",25238.1,25331.7,25151.05,25202.35,254509892,25277.82],["23-Sep-25",25209,25261.9,25084.65,25169.5,299204338,31435.17],["24-Sep-25",25108.75,25149.85,25027.45,25056.9,244382281,22310.05],["25-Sep-25",25034.5,25092.7,24878.3,24890.85,342534768,32715.91],["26-Sep-25",24818.55,24868.6,24629.45,24654.7,291537949,29987.93],["29-Sep-25",24728.55,24791.3,24606.2,24634.9,394388242,40004.93],["30-Sep-25",24691.95,24731.8,24587.7,24611.1,304924720,29285.11],["01-Oct-25",24620.55,24867.95,24605.95,24836.3,308135228,29041.17],["03-Oct-25",24759.55,24904.8,24747.55,24894.25,366929642,31409.06],["06-Oct-25",24916.55,25095.95,24881.65,25077.65,271953070,25160.76],["07-Oct-25",25085.3,25220.9,25076.3,25108.3,286833765,26176.23],["08-Oct-25",25079.75,25192.5,25008.5,25046.15,225967495,21701.19],["09-Oct-25",25074.3,25199.25,25024.3,25181.8,286253252,22617.86],["10-Oct-25",25167.65,25330.75,25156.85,25285.35,232943306,21749.23],["13-Oct-25",25177.3,25267.3,25152.3,25227.35,234285202,20806.83],["14-Oct-25",25277.55,25310.35,25060.55,25145.5,292129083,24151.97]];
+
+const data=RAW.map(r=>({date:r[0],open:r[1],high:r[2],low:r[3],close:r[4],shares:r[5],turnover:r[6],sent:r[4]>r[1]?'pos':'neg',spread:+(r[2]-r[3]).toFixed(2)}));
+const G='#22d484',R='#ff4f6a',B='#4f9eff',GA='rgba(34,212,132,0.75)',RA='rgba(255,79,106,0.75)';
+let mode='all',tlInst,vlInst,spInst;
+
+function getFD(){return mode==='pos'?data.filter(d=>d.sent==='pos'):mode==='neg'?data.filter(d=>d.sent==='neg'):data}
+
+function setFilter(m){
+  mode=m;
+  ['btn-all','btn-pos','btn-neg'].forEach(id=>{document.getElementById(id).className='fbtn'});
+  if(m==='all')document.getElementById('btn-all').className='fbtn fa';
+  else if(m==='pos')document.getElementById('btn-pos').className='fbtn fp';
+  else document.getElementById('btn-neg').className='fbtn fn';
+  const fd=getFD();
+  const n=fd.length,label=m==='all'?'Showing all 126 trading sessions':`Showing ${n} ${m==='pos'?'bullish':'bearish'} sessions`;
+  document.getElementById('fbar-info').textContent=label;
+  document.getElementById('tl-sub').textContent=label;
+  document.getElementById('pie-sub').textContent=n+' sessions';
+  rebuildTimeline(fd);rebuildVol(fd);rebuildSpread(fd);
+}
+
+/* PIE */
+new Chart(document.getElementById('pieChart'),{type:'doughnut',data:{labels:['Bullish','Bearish'],datasets:[{data:[59,67],backgroundColor:[G,R],borderWidth:3,borderColor:'#0e1118',hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw} days (${(c.raw/126*100).toFixed(1)}%)`}}}}});
+
+/* BAR */
+new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:['Apr','May','Jun','Jul','Aug','Sep','Oct'],datasets:[{label:'Bullish',data:[5,9,11,9,5,7,13],backgroundColor:G+'bb',borderRadius:5,borderSkipped:false},{label:'Bearish',data:[6,12,10,14,10,11,4],backgroundColor:R+'bb',borderRadius:5,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b718a',font:{size:11}}},y:{beginAtZero:true,ticks:{stepSize:3,color:'#6b718a',font:{size:11}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+
+/* TIMELINE */
+function rebuildTimeline(fd){
+  if(tlInst)tlInst.destroy();
+  const posD=fd.filter(d=>d.sent==='pos').map(d=>({x:d.date,y:d.close}));
+  const negD=fd.filter(d=>d.sent==='neg').map(d=>({x:d.date,y:d.close}));
+  const lineD=fd.map(d=>({x:d.date,y:d.close}));
+  tlInst=new Chart(document.getElementById('timelineChart'),{type:'scatter',data:{datasets:[{label:'Trend',data:lineD,type:'line',borderColor:'rgba(255,255,255,0.1)',borderWidth:1.5,pointRadius:0,fill:{target:'origin',above:'rgba(79,158,255,0.04)'},tension:0.4,order:2},{label:'Bullish',data:posD,backgroundColor:GA,pointRadius:6,pointHoverRadius:9,order:1},{label:'Bearish',data:negD,backgroundColor:RA,pointRadius:6,pointHoverRadius:9,order:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ₹${c.parsed.y.toLocaleString('en-IN')}`}}},scales:{x:{type:'category',ticks:{maxTicksLimit:8,color:'#6b718a',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6b718a',font:{size:10},callback:v=>'₹'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+/* VOLUME */
+function rebuildVol(fd){
+  if(vlInst)vlInst.destroy();
+  const pv=fd.filter(d=>d.sent==='pos').map(d=>({x:Math.round(d.shares/1e6),y:+d.turnover.toFixed(1)}));
+  const nv=fd.filter(d=>d.sent==='neg').map(d=>({x:Math.round(d.shares/1e6),y:+d.turnover.toFixed(1)}));
+  vlInst=new Chart(document.getElementById('volChart'),{type:'scatter',data:{datasets:[{label:'Bullish',data:pv,backgroundColor:GA,pointRadius:6},{label:'Bearish',data:nv,backgroundColor:RA,pointRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` Vol: ${c.parsed.x}M | ₹${c.parsed.y}Cr`}}},scales:{x:{title:{display:true,text:'Shares (M)',color:'#6b718a',font:{size:10}},ticks:{color:'#6b718a',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},y:{title:{display:true,text:'Turnover (₹Cr)',color:'#6b718a',font:{size:10}},ticks:{color:'#6b718a',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+/* SPREAD */
+function rebuildSpread(fd){
+  if(spInst)spInst.destroy();
+  const ps=fd.filter(d=>d.sent==='pos').map(d=>({x:d.date,y:d.spread}));
+  const ns=fd.filter(d=>d.sent==='neg').map(d=>({x:d.date,y:d.spread}));
+  const ls=fd.map(d=>({x:d.date,y:d.spread}));
+  spInst=new Chart(document.getElementById('spreadChart'),{type:'scatter',data:{datasets:[{label:'Trend',data:ls,type:'line',borderColor:'rgba(255,255,255,0.07)',borderWidth:1.2,pointRadius:0,fill:{target:'origin',above:'rgba(79,158,255,0.05)'},tension:0.4,order:2},{label:'Bullish',data:ps,backgroundColor:GA,pointRadius:4,order:1},{label:'Bearish',data:ns,backgroundColor:RA,pointRadius:4,order:1}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` Spread: ₹${c.parsed.y}`}}},scales:{x:{type:'category',ticks:{maxTicksLimit:6,color:'#6b718a',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6b718a',font:{size:10},callback:v=>'₹'+v},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+/* OHLC */
+function avg(arr,k){return +(arr.reduce((s,d)=>s+d[k],0)/arr.length).toFixed(2)}
+const pos=data.filter(d=>d.sent==='pos'),neg=data.filter(d=>d.sent==='neg');
+new Chart(document.getElementById('ohlcChart'),{type:'bar',data:{labels:['Open','High','Low','Close'],datasets:[{label:'Bullish avg',data:[avg(pos,'open'),avg(pos,'high'),avg(pos,'low'),avg(pos,'close')],backgroundColor:G+'bb',borderRadius:4,borderSkipped:false},{label:'Bearish avg',data:[avg(neg,'open'),avg(neg,'high'),avg(neg,'low'),avg(neg,'close')],backgroundColor:R+'bb',borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#6b718a',font:{size:10},boxWidth:9,padding:10}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ₹${c.raw.toLocaleString('en-IN')}`}}},scales:{x:{grid:{display:false},ticks:{color:'#6b718a',font:{size:11}}},y:{min:23000,ticks:{color:'#6b718a',font:{size:10},callback:v=>'₹'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+
+/* PERFORMANCE */
+new Chart(document.getElementById('perfChart'),{type:'bar',data:{labels:['Prec (Bear)','Recall (Bear)','F1 (Bear)','Prec (Bull)','Recall (Bull)','F1 (Bull)'],datasets:[{data:[93.3,100,96.6,100,91.7,95.7],backgroundColor:[R+'bb',R+'bb',R+'bb',G+'bb',G+'bb',G+'bb'],borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.toFixed(1)}%`}}},scales:{x:{min:85,max:102,ticks:{callback:v=>v+'%',color:'#6b718a',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6b718a',font:{size:10}},grid:{display:false}}}}});
+
+/* FEATURE COEFFICIENTS */
+const coefs=[{name:'Turnover',val:-0.41},{name:'Shares Traded',val:-0.28},{name:'Open',val:-0.19},{name:'Low',val:0.09},{name:'High',val:0.31},{name:'Close',val:0.88}];
+const maxA=0.88;
+const cw=document.getElementById('coefBars');
+coefs.forEach(c=>{
+  const isP=c.val>=0,pct=(Math.abs(c.val)/maxA*100).toFixed(1),col=isP?'var(--green)':'var(--red)';
+  const d=document.createElement('div');d.className='coef-row';
+  d.innerHTML=`<div class="coef-nm">${c.name}</div><div class="coef-track"><div class="${isP?'coef-fill-p':'coef-fill-n'}" style="width:${pct}%"></div></div><div class="coef-v" style="color:${col}">${isP?'+':''}${c.val.toFixed(2)}</div>`;
+  cw.appendChild(d);
+});
+
+/* ============================
+   HEATMAP (pure JS canvas)
+   ============================ */
+const FEATURES=['Open','High','Low','Close','Shares','Turnover','Sentiment'];
+const vals=data.map(d=>[d.open,d.high,d.low,d.close,d.shares/1e6,d.turnover,d.sent==='pos'?1:0]);
+const N=FEATURES.length;
+
+function pearson(a,b){
+  const n=a.length,ma=a.reduce((s,v)=>s+v,0)/n,mb=b.reduce((s,v)=>s+v,0)/n;
+  let num=0,da=0,db=0;
+  for(let i=0;i<n;i++){const x=a[i]-ma,y=b[i]-mb;num+=x*y;da+=x*x;db+=y*y;}
+  return da===0||db===0?0:+(num/Math.sqrt(da*db)).toFixed(3);
+}
+
+const cols=FEATURES.map((_,fi)=>vals.map(row=>row[fi]));
+const corr=[];
+for(let i=0;i<N;i++){corr[i]=[];for(let j=0;j<N;j++)corr[i][j]=pearson(cols[i],cols[j]);}
+
+function corrColor(v){
+  const t=Math.max(-1,Math.min(1,v));
+  if(t>=0){
+    const r=Math.round(34+(79-34)*t),g=Math.round(212+(158-212)*t),b=Math.round(132+(255-132)*t);
+    return`rgba(${r},${g},${b},${0.25+0.75*t})`;
+  } else {
+    const abs=Math.abs(t);
+    const r=Math.round(255),g=Math.round(79*(1-abs)),b=Math.round(106*(1-abs));
+    return`rgba(${r},${g},${b},${0.25+0.75*abs})`;
+  }
+}
+
+const tt=document.getElementById('tt');
+const wrap=document.getElementById('hmWrap');
+
+// Build label row
+const lrow=document.createElement('div');lrow.className='hm-label-row';
+lrow.appendChild(Object.assign(document.createElement('div'),{style:'width:26px'}));
+FEATURES.forEach(f=>{const d=document.createElement('div');d.className='hm-mlabel';d.textContent=f.slice(0,5);lrow.appendChild(d);});
+wrap.appendChild(lrow);
+
+// Build rows
+for(let i=0;i<N;i++){
+  const row=document.createElement('div');row.className='hm-row';
+  const wl=document.createElement('div');wl.className='hm-wlabel';wl.textContent=FEATURES[i].slice(0,5);row.appendChild(wl);
+  for(let j=0;j<N;j++){
+    const cell=document.createElement('div');cell.className='hm-cell';
+    const v=corr[i][j];
+    cell.style.background=corrColor(v);
+    if(i===j){cell.style.background='rgba(255,255,255,0.08)';cell.style.outline='1px solid rgba(255,255,255,0.15)';}
+    // value label inside
+    const lbl=document.createElement('span');
+    lbl.style.cssText='font-size:8px;font-weight:600;color:rgba(255,255,255,0.75);user-select:none;line-height:1;pointer-events:none';
+    lbl.textContent=v.toFixed(2);
+    cell.appendChild(lbl);
+    cell.addEventListener('mouseenter',e=>{
+      tt.style.display='block';
+      tt.innerHTML=`<b>${FEATURES[i]} × ${FEATURES[j]}</b><br>r = <span style="color:${v>=0?'var(--green)':'var(--red)'};font-weight:700">${v.toFixed(3)}</span><br>${v>=0.7?'Strong positive':v>=0.3?'Moderate positive':v>=-0.3?'Weak / no correlation':v>=-0.7?'Moderate negative':'Strong negative'}`;
+    });
+    cell.addEventListener('mousemove',e=>{tt.style.left=(e.clientX+14)+'px';tt.style.top=(e.clientY-10)+'px';});
+    cell.addEventListener('mouseleave',()=>{tt.style.display='none';});
+    row.appendChild(cell);
+  }
+  wrap.appendChild(row);
+}
+
+// Initial chart build
+rebuildTimeline(data);rebuildVol(data);rebuildSpread(data);
+</script>
+</body>
+</html>
